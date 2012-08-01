@@ -5,19 +5,17 @@ Plays the musaks.
 import argparse
 import imp
 import thread
-from time import sleep
+from datetime import timedelta
 
-import pygst
-pygst.require("0.10")
+import pygst; pygst.require("0.10")
 import gst
 import gobject
-gobject.threads_init()
-
 from blessings import Terminal
+
 
 parser = argparse.ArgumentParser(description=globals()['__doc__'],
                                  formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('playlist', help='Filename of the playlist.')
+parser.add_argument('playlist', help='Filename of the playlist module.')
 
 
 class NoodleAmp(gst.Bin):
@@ -36,6 +34,8 @@ class NoodleAmp(gst.Bin):
 
         self.current_song = None
 
+        self.term = Terminal()
+
     def _handle_msg(self, bus, msg):
         if msg.type == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
@@ -52,7 +52,82 @@ class NoodleAmp(gst.Bin):
         self.player.set_property('uri', 'file://{0}'.format(self.current_song))
         self.player.set_state(gst.STATE_PLAYING)
 
+    @property
+    def duration(self):
+        try:
+            return self.player.query_duration(gst.FORMAT_TIME, None)[0]
+        except gst.QueryError:
+            return 0
+
+    @property
+    def position(self):
+        try:
+            return self.player.query_position(gst.FORMAT_TIME, None)[0]
+        except gst.QueryError:
+            return 0
+
+    @property
+    def position_percent(self):
+        position = self.position
+        duration = self.duration
+        if duration > 0:
+            return position / float(duration)
+        else:
+            return 0
+
+    def update_screen(self):
+        term = self.term
+        with term.fullscreen() and term.hidden_cursor():
+            print term.clear
+            self._render_top_bar()
+            self._render_song_info()
+            self._render_seek_bar()
+        return True
+
+    def init_screen(self):
+        term = self.term
+        print term.save
+
+    def cleanup_screen(self):
+        term = self.term
+        print term.restore
+
+    def _render_top_bar(self):
+        term = self.term
+        with term.location(0, 0):
+            print term.on_blue(' ' * term.width)
+            print term.move(0, 1) + term.white_on_blue('NoodleAmp')
+
+    def _render_song_info(self):
+        term = self.term
+        with term.location(2, 2):
+            print term.blue('Current File: '),
+            print self.current_song or 'Unknown'
+
+    def _render_seek_bar(self):
+        term = self.term
+        with term.location(2, 4):
+            bar_width = term.width - 7
+            filled_width = int(self.position_percent * bar_width)
+            empty_width = bar_width - filled_width
+            print (term.blue + '<' + term.white + ('=' * filled_width) +
+                   term.red + '#' + term.blue + ('.' * empty_width) + '>' +
+                   term.normal)
+
+        position_delta = format_td(timedelta(microseconds=self.position / 1000))
+        duration_delta = format_td(timedelta(microseconds=self.duration / 1000))
+        time_string = '{0} / {1}'.format(position_delta, duration_delta)
+        with term.location(term.width - (2 + len(time_string)), 5):
+            print time_string
+
 gobject.type_register(NoodleAmp)
+
+
+def format_td(td):
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return '{0:02d}:{1:02d}:{2:02d}'.format(hours, minutes, seconds)
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -64,18 +139,12 @@ if __name__ == '__main__':
     main = gobject.MainLoop()
     noodleamp = NoodleAmp(main, playlist)
 
-    def update_screen():
-        term = Terminal()
-        with term.fullscreen():
-            while True:
-                print term.clear
-                with term.location(0, 0):
-                    print term.on_blue(' ' * term.width)
-                    print term.move(0, 1) + term.white_on_blue('NoodleAmp')
-                with term.location(2, 2):
-                    print term.blue('Current File: ') + noodleamp.current_song
-                    sleep(0.5)
-
-    thread.start_new_thread(update_screen, ())
+    noodleamp.init_screen()
+    gobject.threads_init()
+    gobject.timeout_add(100, noodleamp.update_screen)
     noodleamp.play_next()
-    main.run()
+    try:
+        main.run()
+    except KeyboardInterrupt:
+        pass
+    noodleamp.cleanup_screen()
