@@ -77,20 +77,21 @@ class NoodleAmp(gst.Bin):
 
     def update_screen(self):
         term = self.term
-        with term.fullscreen() and term.hidden_cursor():
-            print term.clear
-            self._render_top_bar()
-            self._render_song_info()
-            self._render_seek_bar()
+        print term.clear
+        self._render_top_bar()
+        self._render_song_info()
+        self._render_seek_bar()
         return True
 
     def init_screen(self):
         term = self.term
-        print term.save
+        print term.enter_fullscreen
+        print term.hide_cursor
 
     def cleanup_screen(self):
         term = self.term
-        print term.restore
+        print term.normal_cursor
+        print term.exit_fullscreen
 
     def _render_top_bar(self):
         term = self.term
