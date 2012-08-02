@@ -115,6 +115,7 @@ class NoodleAmp(gst.Bin):
         self._render_controls()
         with term.location(2, term.height - 1):
             print self.debug,
+        print term.move(term.height - 2, 0)
         return True
 
     def init_screen(self):
