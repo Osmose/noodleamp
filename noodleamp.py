@@ -72,16 +72,20 @@ class NoodleAmp(gst.Bin):
         elif letter == 'n':
             self.play_next()
 
+    def player_has_state(self, state):
+        states = [s for s in self.player.get_state() if
+                  isinstance(s, state.__class__)]
+        return state in states
+
     def pause(self):
-        states = self.player.get_state()
-        if gst.STATE_PLAYING in states:
+        if self.player_has_state(gst.STATE_PLAYING):
             self.player.set_state(gst.STATE_PAUSED)
-        elif gst.STATE_PAUSED in states:
+        elif self.player_has_state(gst.STATE_PAUSED):
             self.player.set_state(gst.STATE_PLAYING)
 
     @property
     def is_paused(self):
-        return gst.STATE_PAUSED in self.player.get_state()
+        return self.player_has_state(gst.STATE_PAUSED)
 
     @property
     def duration(self):
@@ -108,11 +112,8 @@ class NoodleAmp(gst.Bin):
 
     def update_screen(self):
         term = self.term
-        print term.clear
-        self._render_top_bar()
         self._render_song_info()
         self._render_seek_bar()
-        self._render_controls()
         with term.location(2, term.height - 1):
             print self.debug,
         print term.move(term.height - 2, 0)
@@ -122,6 +123,9 @@ class NoodleAmp(gst.Bin):
         term = self.term
         print term.enter_fullscreen
         print term.hide_cursor
+        print term.clear
+        self._render_top_bar()
+        self._render_controls()
 
         self.fd = sys.stdin.fileno()
 
@@ -145,13 +149,16 @@ class NoodleAmp(gst.Bin):
         term = self.term
         with term.location(0, 0):
             print term.on_blue(' ' * term.width)
-            print term.move(0, 1) + term.white_on_blue('NoodleAmp')
+            print term.move(0, 2) + term.white_on_blue('NoodleAmp')
 
     def _render_song_info(self):
         term = self.term
         with term.location(2, 2):
             print term.blue('Current File: '),
-            print self.current_song or 'Unknown'
+            available_width = term.width - 18
+            song_name = self.current_song or 'Unknown'
+            format_string = '{0:<%ss}' % available_width
+            print format_string.format(song_name[:available_width])
 
     def _render_seek_bar(self):
         term = self.term
