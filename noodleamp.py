@@ -3,8 +3,12 @@
 Plays the musaks.
 """
 import argparse
+import fcntl
 import imp
-import thread
+import os
+import select
+import sys
+import termios
 from datetime import timedelta
 
 import pygst; pygst.require("0.10")
@@ -35,13 +39,14 @@ class NoodleAmp(gst.Bin):
         self.current_song = None
 
         self.term = Terminal()
+        self.debug = ''
 
     def _handle_msg(self, bus, msg):
         if msg.type == gst.MESSAGE_EOS:
-            self.player.set_state(gst.STATE_NULL)
             self.play_next()
 
     def play_next(self):
+        self.player.set_state(gst.STATE_NULL)
         try:
             self.current_song = self.playlist.next()
         except StopIteration:
@@ -51,6 +56,32 @@ class NoodleAmp(gst.Bin):
         self.player.set_state(gst.STATE_READY)
         self.player.set_property('uri', 'file://{0}'.format(self.current_song))
         self.player.set_state(gst.STATE_PLAYING)
+
+    def read_input(self):
+        try:
+            c = sys.stdin.read(1)
+            self.handle_input(c)
+        except IOError:
+            pass
+        return True
+
+    def handle_input(self, letter):
+        letter = letter.lower()
+        if letter == 'p':
+            self.pause()
+        elif letter == 'n':
+            self.play_next()
+
+    def pause(self):
+        states = self.player.get_state()
+        if gst.STATE_PLAYING in states:
+            self.player.set_state(gst.STATE_PAUSED)
+        elif gst.STATE_PAUSED in states:
+            self.player.set_state(gst.STATE_PLAYING)
+
+    @property
+    def is_paused(self):
+        return gst.STATE_PAUSED in self.player.get_state()
 
     @property
     def duration(self):
@@ -81,6 +112,9 @@ class NoodleAmp(gst.Bin):
         self._render_top_bar()
         self._render_song_info()
         self._render_seek_bar()
+        self._render_controls()
+        with term.location(2, term.height - 1):
+            print self.debug,
         return True
 
     def init_screen(self):
@@ -88,7 +122,20 @@ class NoodleAmp(gst.Bin):
         print term.enter_fullscreen
         print term.hide_cursor
 
+        self.fd = sys.stdin.fileno()
+
+        self.oldterm = termios.tcgetattr(self.fd)
+        self.newattr = termios.tcgetattr(self.fd)
+        self.newattr[3] = self.newattr[3] & ~termios.ICANON & ~termios.ECHO
+        termios.tcsetattr(self.fd, termios.TCSANOW, self.newattr)
+
+        self.oldflags = fcntl.fcntl(self.fd, fcntl.F_GETFL)
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags | os.O_NONBLOCK)
+
     def cleanup_screen(self):
+        termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.oldterm)
+        fcntl.fcntl(self.fd, fcntl.F_SETFL, self.oldflags)
+
         term = self.term
         print term.normal_cursor
         print term.exit_fullscreen
@@ -121,6 +168,15 @@ class NoodleAmp(gst.Bin):
         with term.location(term.width - (2 + len(time_string)), 5):
             print time_string
 
+        if self.is_paused:
+            with term.location(2, 5):
+                print term.blue('Paused')
+
+    def _render_controls(self):
+        term = self.term
+        with term.location(2, 7):
+            print '(P)lay/(P)ause (N)ext Song'
+
 gobject.type_register(NoodleAmp)
 
 
@@ -142,6 +198,7 @@ if __name__ == '__main__':
 
     noodleamp.init_screen()
     gobject.threads_init()
+    gobject.timeout_add(100, noodleamp.read_input)
     gobject.timeout_add(100, noodleamp.update_screen)
     noodleamp.play_next()
     try:
