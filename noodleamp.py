@@ -6,9 +6,9 @@ import argparse
 import fcntl
 import imp
 import os
-import select
 import sys
 import termios
+from collections import deque
 from datetime import timedelta
 
 import pygst; pygst.require("0.10")
@@ -41,14 +41,30 @@ class NoodleAmp(gst.Bin):
         self.term = Terminal()
         self.debug = ''
 
+        self.song_buffer = deque()
+
     def _handle_msg(self, bus, msg):
         if msg.type == gst.MESSAGE_EOS:
             self.play_next()
 
+    def pop_next_song(self):
+        if self.song_buffer:
+            return self.song_buffer.popleft()
+        else:
+            return self.playlist.next()
+
+    def peek_next_songs(self, count=1):
+        songs = []
+        for k in range(count):
+            if len(self.song_buffer) == k:
+                self.song_buffer.append(self.playlist.next())
+            songs.append(self.song_buffer[k])
+        return songs
+
     def play_next(self):
         self.player.set_state(gst.STATE_NULL)
         try:
-            self.current_song = self.playlist.next()
+            self.current_song = self.pop_next_song()
         except StopIteration:
             self.main_loop.quit()
             return
@@ -56,6 +72,7 @@ class NoodleAmp(gst.Bin):
         self.player.set_state(gst.STATE_READY)
         self.player.set_property('uri', 'file://{0}'.format(self.current_song))
         self.player.set_state(gst.STATE_PLAYING)
+        self._render_playlist()
 
     def read_input(self):
         try:
@@ -126,6 +143,7 @@ class NoodleAmp(gst.Bin):
         print term.clear
         self._render_top_bar()
         self._render_controls()
+        self._render_playlist()
 
         self.fd = sys.stdin.fileno()
 
@@ -166,6 +184,8 @@ class NoodleAmp(gst.Bin):
             bar_width = term.width - 7
             filled_width = int(self.position_percent * bar_width)
             empty_width = bar_width - filled_width
+            if filled_width + empty_width > bar_width:
+                raise Exception('Oh noes!: %s/%s/%s' % (filled_width, empty_width, bar_width))
             print (term.blue + '<' + term.white + ('=' * filled_width) +
                    term.red + '#' + term.blue + ('.' * empty_width) + '>' +
                    term.normal)
@@ -177,13 +197,27 @@ class NoodleAmp(gst.Bin):
             print time_string
 
         if self.is_paused:
-            with term.location(2, 5):
-                print term.blue('Paused')
+            pause_str = 'Paused'
+        else:
+            pause_str = '      '
+        with term.location(2, 5):
+            print term.blue(pause_str)
 
     def _render_controls(self):
         term = self.term
         with term.location(2, 7):
             print '(P)lay/(P)ause (N)ext Song'
+
+    def _render_playlist(self):
+        term = self.term
+        with term.location(0, 8):
+            print '-' * term.width,
+        with term.location(0, 9):
+            songs = self.peek_next_songs(term.height - 10)
+            available_width = term.width - 4
+            format_string = '  {0:<%ss}' % available_width
+            for song in songs:
+                print format_string.format(song[:available_width])
 
 gobject.type_register(NoodleAmp)
 
