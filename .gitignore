@@ -1,3 +1,4 @@
+.DS_store
 *.pyc
 build
 noodleamp.egg-info

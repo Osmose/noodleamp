@@ -1,0 +1,12 @@
+<ul class="jqueryFileTree" style="display: none;">
+    {% for dir in dirs %}
+      <li class="directory collapsed">
+        <a href="#" rel="{{ dir[1] }}/">{{ dir[2] }}</a>
+      </li>
+    {% endfor %}
+    {% for file in files %}
+      <li class="file ext_txt">
+        <a href="#" rel="{{ file[1] }}">{{ file[2] }}</a>
+      </li>
+    {% endfor %}
+</ul>
