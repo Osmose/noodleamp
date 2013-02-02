@@ -1,4 +1,4 @@
-from noodleamp.base import NoodleAmp
+from noodleamp.base import *
 
 
 __title__ = 'noodleamp'

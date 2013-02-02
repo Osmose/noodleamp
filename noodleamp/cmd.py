@@ -1,40 +1,63 @@
 import argparse
 import gobject
+import imp
 
-from noodleamp import NoodleAmp
-
-
-parser = argparse.ArgumentParser(description=globals()['__doc__'],
-                                 formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('--file', help='File to play.')
-parser.add_argument('--http', help='Launch HTTP server to control player.',
-                    action='store_true')
+from noodleamp import NoodleAmp, Playlist
 
 
-def server():
+def server(args):
     from noodleamp.server import app
     app.run(debug=True, port=8000)
 
 
-def play(filename):
-    noodleamp = NoodleAmp()
-    main = gobject.MainLoop()
+def play(args):
+    filename = args[0]
 
-    noodleamp.on_end(lambda n: main.quit())
-    noodleamp.play('file://{0}'.format(filename))
+    noodleamp = NoodleAmp()
+    main_loop = gobject.MainLoop()
+
+    # Try importing the file as a module first.
+    module = None
     try:
-        main.run()
+        module = imp.load_source('playlist', filename)
+    except:
+        pass
+
+    if module:
+        playlist = Playlist(module.playlist())
+        filename = playlist.next()
+        def on_end(noodleamp):
+            try:
+                noodleamp.play(playlist.next())
+            except StopIteration:
+                main_loop.quit()
+    else:
+        def on_end(noodleamp):
+            main_loop.quit()
+
+    noodleamp.on_end(on_end)
+    noodleamp.play(filename)
+    try:
+        main_loop.run()
     except KeyboardInterrupt:
-        main.quit()
+        main_loop.quit()
+
+
+commands = {
+    'server': server,
+    'play': play,
+}
+
+
+parser = argparse.ArgumentParser(description=globals()['__doc__'],
+                                 formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument('command', choices=commands.keys(), default='play')
+parser.add_argument('command_args', nargs='*')
 
 
 def main():
     args = parser.parse_args()
-
-    if args.http:
-        server()
-    elif args.file:
-        play(args.file)
+    return commands[args.command](args.command_args)
 
 
 if __name__ == '__main__':
