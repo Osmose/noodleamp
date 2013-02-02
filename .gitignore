@@ -1,1 +1,4 @@
-my_playlists
+*.pyc
+build
+noodleamp.egg-info
+dist

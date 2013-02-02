@@ -1,18 +1,8 @@
 #!/usr/bin/env python
-"""
-Plays the musaks.
-"""
-import argparse
 import gst
-import gobject
 
 
-parser = argparse.ArgumentParser(description=globals()['__doc__'],
-                                 formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('file', help='File to play.')
-
-
-class NoodleAmp2(object):
+class Noodleamp(object):
     def __init__(self):
         self.player = gst.element_factory_make('playbin2', 'player')
         fakesink = gst.element_factory_make('fakesink', 'fakesink')
@@ -51,17 +41,5 @@ class NoodleAmp2(object):
             for func in self.callbacks:
                 func(self)
 
-
-if __name__ == '__main__':
-    args = parser.parse_args()
-
-    song_filename = args.file
-    noodleamp = NoodleAmp2()
-    main = gobject.MainLoop()
-
-    noodleamp.on_end(lambda n: main.quit())
-    noodleamp.play('file://{0}'.format(song_filename))
-    try:
-        main.run()
-    except KeyboardInterrupt:
-        main.quit()
+    def __del__(self):
+        self.player.set_state(gst.STATE_NULL)
