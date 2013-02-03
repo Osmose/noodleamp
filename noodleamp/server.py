@@ -48,7 +48,7 @@ def pause():
     if player.is_playing:
         player.pause()
     else:
-        player.play()
+        player.unpaused()
     return json.dumps({'status': 'ok'})
 
 

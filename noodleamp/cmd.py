@@ -1,8 +1,7 @@
 import argparse
 import gobject
-import imp
 
-from noodleamp import NoodleAmp, Playlist
+from noodleamp import NoodleAmp
 
 
 def server(args):
@@ -16,26 +15,10 @@ def play(args):
     noodleamp = NoodleAmp()
     main_loop = gobject.MainLoop()
 
-    # Try importing the file as a module first.
-    module = None
-    try:
-        module = imp.load_source('playlist', filename)
-    except:
-        pass
+    @noodleamp.on_end
+    def on_end(noodleamp):
+        main_loop.quit()
 
-    if module:
-        playlist = Playlist(module.playlist())
-        filename = playlist.next()
-        def on_end(noodleamp):
-            try:
-                noodleamp.play(playlist.next())
-            except StopIteration:
-                main_loop.quit()
-    else:
-        def on_end(noodleamp):
-            main_loop.quit()
-
-    noodleamp.on_end(on_end)
     noodleamp.play(filename)
     try:
         main_loop.run()

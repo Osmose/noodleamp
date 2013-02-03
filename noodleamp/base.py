@@ -1,3 +1,4 @@
+import imp
 from collections import deque
 from urlparse import urlparse, urlunparse
 
@@ -15,6 +16,7 @@ class NoodleAmp(object):
         self.bus.connect("message", self._handle_msg)
 
         self.current_song = None
+        self.playlist = None
         self.callbacks = []
 
     @property
@@ -27,12 +29,23 @@ class NoodleAmp(object):
     def pause(self):
         self.player.set_state(gst.STATE_PAUSED)
 
-    def play(self, url=None):
-        url = self._fix_url(url) if url else url
-        if not url and not self.current_song:
-            raise Exception('No song specified!')
+    def unpause(self):
+        self.player.set_state(gst.STATE_PLAYING)
 
-        if url and (url != self.current_song or not self.is_playing):
+    def play(self, url):
+        # Try loading as a module first.
+        module = None
+        try:
+            module = imp.load_source('playlist', url)
+        except:
+            pass
+
+        if module:
+            self.playlist = Playlist(module.playlist())
+            url = self.playlist.next()
+
+        if url:
+            url = self._fix_url(url)
             self.stop()
             self.current_song = url
             self.player.set_state(gst.STATE_READY)
@@ -42,10 +55,16 @@ class NoodleAmp(object):
 
     def on_end(self, func):
         self.callbacks.append(func)
+        return func
 
     def _handle_msg(self, bus, msg):
         if msg.type == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
+            if self.playlist:
+                try:
+                    return self.play(self.playlist.next())
+                except StopIteration:
+                    pass
             for func in self.callbacks:
                 func(self)
 
