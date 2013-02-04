@@ -11,7 +11,8 @@ from noodleamp import NoodleAmp
 app = Flask(__name__)
 app.config.from_object('noodleamp.settings')
 app.config.from_envvar('NOODLEAMP_SETTINGS')
-player = NoodleAmp()
+
+app.player = NoodleAmp()
 playable_ext = ('mp3', 'ogg', 'wav', 'py')
 
 
@@ -39,22 +40,22 @@ def play():
     if path:
         path = normalize_library_path(path)
 
-    player.play(path)
+    app.player.play(path)
     return json.dumps({'status': 'ok'})
 
 
 @app.route('/pause/', methods=['POST'])
 def pause():
-    if player.is_playing:
-        player.pause()
+    if app.player.is_playing:
+        app.player.pause()
     else:
-        player.unpaused()
+        app.player.unpaused()
     return json.dumps({'status': 'ok'})
 
 
 @app.route('/stop/', methods=['POST'])
 def stop():
-    player.stop()
+    app.player.stop()
     return json.dumps({'status': 'ok'})
 
 

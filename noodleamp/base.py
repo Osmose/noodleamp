@@ -1,8 +1,19 @@
 import imp
+import threading
 from collections import deque
 from urlparse import urlparse, urlunparse
 
+import gobject
 import gst
+
+
+gobject.threads_init()
+
+
+class EventThread(threading.Thread):
+    def run(self):
+        self.main_loop = gobject.MainLoop()
+        self.main_loop.run()
 
 
 class NoodleAmp(object):
@@ -13,11 +24,15 @@ class NoodleAmp(object):
 
         self.bus = self.player.get_bus()
         self.bus.add_signal_watch()
-        self.bus.connect("message", self._handle_msg)
+        self.bus.connect('message::eos', self._handle_eos)
 
         self.current_song = None
         self.playlist = None
         self.callbacks = []
+
+        self.event_thread = EventThread()
+        self.event_thread.daemon = True
+        self.event_thread.start()
 
     @property
     def is_playing(self):
@@ -57,16 +72,15 @@ class NoodleAmp(object):
         self.callbacks.append(func)
         return func
 
-    def _handle_msg(self, bus, msg):
-        if msg.type == gst.MESSAGE_EOS:
-            self.player.set_state(gst.STATE_NULL)
-            if self.playlist:
-                try:
-                    return self.play(self.playlist.next())
-                except StopIteration:
-                    pass
-            for func in self.callbacks:
-                func(self)
+    def _handle_eos(self, bus, msg):
+        self.player.set_state(gst.STATE_NULL)
+        if self.playlist:
+            try:
+                return self.play(self.playlist.next())
+            except StopIteration:
+                pass
+        for func in self.callbacks:
+            func(self)
 
     def _fix_url(self, url):
         parsed = urlparse(url)
