@@ -10,7 +10,7 @@ from noodleamp import NoodleAmp
 
 app = Flask(__name__)
 app.config.from_object('noodleamp.settings')
-app.config.from_envvar('NOODLEAMP_SETTINGS')
+app.config.from_envvar('NOODLEAMP_SETTINGS', silent=True)
 
 app.player = NoodleAmp()
 playable_ext = ('mp3', 'ogg', 'wav', 'py')
@@ -34,6 +34,20 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/status/', methods=['GET'])
+def status():
+    if app.player.is_playing:
+        return json.dumps({
+            'current_song': '%s - %s' % (app.player.song_artist(), app.player.song_title()),
+            'progress': app.player.song_progress(),
+            'length': app.player.song_length(),
+            'artist': app.player.song_artist(),
+            'title': app.player.song_title()
+        })
+    else:
+        return json.dumps({'current_song': None})
+
+
 @app.route('/play/', methods=['POST'])
 def play():
     path = request.form.get('path', None)
@@ -49,7 +63,7 @@ def pause():
     if app.player.is_playing:
         app.player.pause()
     else:
-        app.player.unpaused()
+        app.player.unpause()
     return json.dumps({'status': 'ok'})
 
 

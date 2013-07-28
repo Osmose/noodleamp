@@ -1,6 +1,8 @@
 ;(function($) {
     var $document = $(document);
     var $play = $('.play');
+    var $length = $('.status .length');
+    var $progress = $('.status .songprogress');
     var $nowPlaying = $('.now-playing .title');
 
     $(function() {
@@ -17,6 +19,15 @@
             pause();
         });
     });
+
+    function getstatus() {
+        $.getJSON('/status/', function(data) {
+            $nowPlaying.text(data['current_song']);
+            $progress.text(data['progress']);
+            $length.text(data['length']);
+        });
+    }
+    setInterval(getstatus, 1000);
 
     var paused = false;
     function play(file) {
