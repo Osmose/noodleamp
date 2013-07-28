@@ -38,14 +38,14 @@ def index():
 def status():
     if app.player.is_playing:
         return json.dumps({
-            'current_song': '%s - %s' % (app.player.song_artist(), app.player.song_title()),
-            'progress': app.player.song_progress(),
-            'length': app.player.song_length(),
-            'artist': app.player.song_artist(),
-            'title': app.player.song_title()
+            'playing': True,
+            'position': app.player.song_position,
+            'length': app.player.song_length,
+            'artist': app.player.song_artist,
+            'title': app.player.song_title
         })
     else:
-        return json.dumps({'current_song': None})
+        return json.dumps({'playing': False})
 
 
 @app.route('/play/', methods=['POST'])

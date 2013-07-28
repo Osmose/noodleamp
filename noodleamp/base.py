@@ -7,6 +7,7 @@ import gobject
 import gst
 from gst.extend.discoverer import Discoverer
 
+
 gobject.threads_init()
 
 
@@ -27,7 +28,7 @@ class NoodleAmp(object):
         self.bus.connect('message', self._handle_message)
 
         self.current_song = None
-        self.metadata = []
+        self.metadata = {}
         self.playlist = None
         self.callbacks = []
 
@@ -73,9 +74,7 @@ class NoodleAmp(object):
 
         self.player.set_state(gst.STATE_PLAYING)
 
-    def status_song(self):
-        return self.current_song
-
+    @property
     def song_length(self):
         if self.is_playing:
             duration = self.player.query_duration(gst.FORMAT_TIME, None)[0]
@@ -84,43 +83,46 @@ class NoodleAmp(object):
             return self._convert_ns(duration)
         return "00:00"
 
+    @property
     def song_title(self):
-        return self.metadata['tags']['title']
+        return self.metadata.tags['title']
 
+    @property
     def song_artist(self):
-        return self.metadata['tags']['artist']
+        return self.metadata.tags['artist']
 
-    def song_progress(self):
+    @property
+    def song_position(self):
         if self.is_playing:
             duration = self.player.query_position(gst.FORMAT_TIME, None)[0]
-            if duration == -1:
-                return "00:00"
             return self._convert_ns(duration)
         return "00:00"
 
     # Borrowed code from: http://pygstdocs.berlios.de/pygst-tutorial/seeking.html
-    def _convert_ns(self, t):
-        s, ns = divmod(t, 1000000000)
-        m, s = divmod(s, 60)
+    def _convert_ns(self, time):
+        if time == -1:
+            return "00:00"
+        seconds, nanoseconds = divmod(time, 1000000000)
+        minutes, seconds = divmod(seconds, 60)
 
-        if m < 60:
-            return "%02i:%02i" % (m, s)
+        if minutes < 60:
+            return "%02i:%02i" % (minutes, seconds)
         else:
-            h, m = divmod(m, 60)
-            return "%i:%02i:%02i" % (h, m, s)
+            hours, minutes = divmod(minutes, 60)
+            return "%i:%02i:%02i" % (hours, minutes, seconds)
 
     def on_end(self, func):
         self.callbacks.append(func)
         return func
 
     def _discovered(self, discoverer, ismedia):
-        self.metadata = discoverer.__dict__
+        self.metadata = discoverer
 
     def _handle_message(self, bus, msg):
-        t = msg.type
-        if t == gst.MESSAGE_ERROR:
-            print "Error playing file: %s" % self.current_song
-        elif t == gst.MESSAGE_EOS:
+        msgtype = msg.type
+        if msgtype == gst.MESSAGE_ERROR:
+            print "Error playing file: {0}".format(self.current_song)
+        elif msgtype == gst.MESSAGE_EOS:
             self.player.set_state(gst.STATE_NULL)
         else:
             return

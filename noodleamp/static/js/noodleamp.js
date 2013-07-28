@@ -2,7 +2,7 @@
     var $document = $(document);
     var $play = $('.play');
     var $length = $('.status .length');
-    var $progress = $('.status .songprogress');
+    var $position = $('.status .position');
     var $nowPlaying = $('.now-playing .title');
 
     $(function() {
@@ -22,9 +22,15 @@
 
     function getstatus() {
         $.getJSON('/status/', function(data) {
-            $nowPlaying.text(data['current_song']);
-            $progress.text(data['progress']);
-            $length.text(data['length']);
+            if (data['playing']) {
+                $nowPlaying.text(data['artist'] + " - " + data['title'] );
+                $position.text(data['position']);
+                $length.text(data['length']);
+            } else {
+                $length.text('00:00');
+                $position.text('00:00');
+                $nowPlaying.text('');
+            }
         });
     }
     setInterval(getstatus, 1000);
@@ -33,7 +39,6 @@
     function play(file) {
         $play.find('.text').text('Pause');
         $play.find('.icon').attr('class', 'icon icon-pause');
-        $nowPlaying.text(file);
         paused = false;
         $.post('/play/', {path: file});
     }
