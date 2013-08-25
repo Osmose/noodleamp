@@ -11,7 +11,7 @@ A Python-based terminal music player that uses generators as playlists.
 Infinite thanks to the [Mopidy](http://www.mopidy.com) team for setting up brew
 recipes for installing gstreamer and being 500% more helpful than anything else
 in the world on trying to get gstreamer installed on OS X. You should read
-[their instructions](http://mopidy.readthedocs.org/en/latest/installation/gstreamer/)
+[their instructions](http://docs.mopidy.com/en/latest/installation/)
 for more information.
 
 ## Usage
